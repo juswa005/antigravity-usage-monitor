@@ -14,6 +14,28 @@ It gives you:
 
 ---
 
+## Screenshots
+
+### Waybar Module
+
+![Waybar Antigravity Module](assets/waybar.png)
+
+### Dashboard & Green-Dot Activity Heatmap
+
+![TUI Dashboard](assets/dashboard.png)
+
+![History & Green Dots Heatmap](assets/history.png)
+
+### Models, Token Breakdown & Diagnostics
+
+| Models | Tokens |
+| :---: | :---: |
+| ![Models Tab](assets/models.png) | ![Tokens Tab](assets/tokens.png) |
+
+![Doctor Diagnostics](assets/doctor.png)
+
+---
+
 ## Requirements
 
 - Linux (Wayland optional — CLI & TUI work over SSH/TTY too)

@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh Antigravity Usage Monitor cache and SQLite history
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/agmonitor refresh --signal-waybar

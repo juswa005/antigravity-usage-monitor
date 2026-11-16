@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v agmonitor >/dev/null 2>&1; then
+    BIN="agmonitor"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+    if [ -x "$REPO_ROOT/target/release/agmonitor" ]; then
+        BIN="$REPO_ROOT/target/release/agmonitor"
+    elif [ -x "$REPO_ROOT/target/debug/agmonitor" ]; then
+        BIN="$REPO_ROOT/target/debug/agmonitor"
+    else
+        echo '{"text":"󰚩 AG N/A","tooltip":"agmonitor binary not found in PATH or target/","class":["unavailable"],"alt":"unavailable"}'
+        exit 0
+    fi
+fi
+
+if [ "$#" -eq 0 ]; then
+    exec "$BIN" waybar --non-blocking
+else
+    exec "$BIN" waybar "$@"
+fi

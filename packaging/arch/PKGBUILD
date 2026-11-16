@@ -1,0 +1,49 @@
+# Maintainer: Antigravity Usage Monitor Contributors
+pkgname=antigravity-usage-monitor
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Lightweight TUI dashboard and Waybar module for Google Antigravity CLI usage"
+arch=('x86_64' 'aarch64')
+url="https://github.com/juswa005/antigravity-usage-monitor"
+license=('MIT')
+depends=('gcc-libs')
+makedepends=('cargo')
+optdepends=(
+  'waybar: status bar integration'
+  'kitty: terminal popup for dashboard'
+)
+source=()
+
+prepare() {
+  cd "$startdir/../.."
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$startdir/../.."
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo build --frozen --release --all-features
+}
+
+package() {
+  cd "$startdir/../.."
+  install -Dm755 "$srcdir/target/release/agmonitor" "$pkgdir/usr/bin/agmonitor"
+  install -Dm644 config/config.toml "$pkgdir/usr/share/doc/$pkgname/config.toml.example"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/lib/systemd/user/agmonitor-refresh.service" <<'EOF'
+[Unit]
+Description=Refresh Antigravity Usage Monitor cache and SQLite history
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/agmonitor refresh --signal-waybar
+EOF
+
+  install -Dm644 packaging/systemd/agmonitor-refresh.timer \
+    "$pkgdir/usr/lib/systemd/user/agmonitor-refresh.timer"
+}

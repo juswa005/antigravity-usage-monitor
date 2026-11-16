@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic Antigravity Usage Monitor refresh timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5m
+Unit=agmonitor-refresh.service
+
+[Install]
+WantedBy=timers.target

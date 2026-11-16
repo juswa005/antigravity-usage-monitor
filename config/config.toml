@@ -1,0 +1,53 @@
+# Antigravity Usage Monitor (agmonitor) configuration
+# Default path: ~/.config/agmonitor/config.toml
+
+[general]
+# Antigravity CLI executable name or absolute path
+agy_binary = "agy"
+
+# Antigravity CLI data directory (defaults to ~/.gemini/antigravity-cli)
+# antigravity_dir = "/home/user/.gemini/antigravity-cli"
+
+# Refresh interval for cached usage snapshots (seconds)
+refresh_interval_secs = 300
+
+# Subprocess timeout when running `agy models` / `agy --version` (seconds)
+cli_timeout_secs = 10
+
+# Fetch live 5-hour & weekly quota percentages + reset timers via `agy` `/usage` in a headless PTY
+fetch_tui_usage = true
+usage_timeout_secs = 15
+
+# Mask authenticated email address in UI and Waybar output (e.g. am***@gmail.com)
+mask_email = true
+
+# Optional fallback: configure a local 5-hour token budget if `fetch_tui_usage = false`
+# local_5h_token_budget = 0
+budget_include_cache_read = false
+
+[waybar]
+# Display mode:
+#   "quota"        - active model's limiting % + reset countdown (e.g. "󰚩 AG 85% · 3h 06m")
+#   "pools"        - all 3 pool % side-by-side (e.g. "󰚩 G:85% C:100% A:29%")
+#   "tokens_5h"    - 5h fresh tokens + active model
+#   "tokens_today" - today's fresh tokens + active model
+#   "model"        - active model + live model count
+#   "compact"      - compact 5h token count
+display_mode = "quota"
+
+# Warning and critical remaining percentage thresholds
+warning_remaining_pct = 30.0
+critical_remaining_pct = 10.0
+
+# Signal number used for `pkill -RTMIN+<signal> waybar` on background/manual refresh
+signal = 10
+
+# Terminal launch commands for Waybar clicks & TUI shortcuts
+terminal_command = "kitty --class agmonitor -e agmonitor"
+agy_launch_command = "kitty --class waybar-kitty -e agy"
+
+[history]
+# Number of days to show in default `agmonitor history`
+default_days = 14
+# Maximum snapshot rows to retain in SQLite (0 = unlimited)
+max_snapshots = 5000

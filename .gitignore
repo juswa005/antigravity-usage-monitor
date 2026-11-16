@@ -1,0 +1,6 @@
+/target/
+/result
+/result-*
+*.swp
+*.bak
+.DS_Store

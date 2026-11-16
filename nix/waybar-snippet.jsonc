@@ -1,0 +1,20 @@
+// Add "custom/antigravity" to "modules-right" (before "group/hardware" or "tray")
+// in ~/.config/waybar/config.jsonc:
+//
+//   "modules-right": [
+//     "custom/antigravity",
+//     "group/hardware",
+//     ...
+//   ],
+
+"custom/antigravity": {
+  "exec": "agmonitor waybar --non-blocking",
+  "return-type": "json",
+  "format": "{}",
+  "interval": 30,
+  "signal": 10,
+  "on-click": "kitty --class agmonitor -e agmonitor",
+  "on-click-right": "agmonitor waybar --refresh",
+  "on-click-middle": "kitty --class waybar-kitty -e agy",
+  "tooltip": true
+}

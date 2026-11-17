@@ -70,10 +70,10 @@ It gives you:
 
 ### Option 1: Arch Linux
 
-Build & install directly with `makepkg` using [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD):
+Build & install directly with `makepkg` using [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD) (pulls in `rust`/`cargo`, `gcc`, `pkgconf`, `sqlite`, and `procps-ng`):
 
 ```bash
-sudo pacman -S --needed rust base-devel
+sudo pacman -S --needed rust base-devel git pkgconf sqlite procps-ng
 git clone https://github.com/juswa005/antigravity-usage-monitor.git
 cd antigravity-usage-monitor/packaging/arch
 makepkg -si
@@ -82,14 +82,12 @@ makepkg -si
 systemctl --user enable --now agmonitor-refresh.timer
 ```
 
-Or install to `~/.local/bin` via `./scripts/install.sh --with-timer`.
+Or install to `~/.local/bin` via `./scripts/install.sh --install-deps --with-timer`.
 
 ### Option 2: Debian / Ubuntu (and derivatives)
 
-SQLite is bundled via `rusqlite`, so only a standard C compiler + Rust (`rustup` or `cargo`) are needed:
-
 ```bash
-sudo apt update && sudo apt install -y build-essential git curl
+sudo apt update && sudo apt install -y build-essential pkg-config libsqlite3-dev procps git curl
 # If cargo is not installed yet:
 # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
@@ -136,6 +134,8 @@ services.antigravity-usage-monitor = {
 ```
 
 ### Option 4: Cargo (Any Linux Distro)
+
+Requires `gcc`/`cc` (for bundled SQLite) or `pkg-config` + `sqlite` dev headers:
 
 ```bash
 cargo install --git https://github.com/juswa005/antigravity-usage-monitor.git

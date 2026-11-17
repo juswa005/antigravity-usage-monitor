@@ -1,4 +1,4 @@
-# Maintainer: Antigravity Usage Monitor Contributors
+# Maintainer: Amiel Josh Basug <amieljosh05@gmail.com>
 pkgname=antigravity-usage-monitor
 pkgver=0.1.0
 pkgrel=1
@@ -6,29 +6,51 @@ pkgdesc="Lightweight TUI dashboard and Waybar module for Google Antigravity CLI 
 arch=('x86_64' 'aarch64')
 url="https://github.com/juswa005/antigravity-usage-monitor"
 license=('MIT')
-depends=('gcc-libs')
-makedepends=('cargo')
+depends=('gcc-libs' 'glibc' 'sqlite' 'procps-ng')
+makedepends=('cargo' 'gcc' 'git' 'pkgconf' 'sqlite')
 optdepends=(
   'waybar: status bar integration'
   'kitty: terminal popup for dashboard'
+  'ttf-jetbrains-mono-nerd: Nerd Font icons in Waybar and TUI'
 )
 source=()
 
+_repo_root() {
+  if [ -f "$startdir/../../Cargo.toml" ]; then
+    printf '%s\n' "$startdir/../.."
+  else
+    printf '%s\n' "$srcdir/$pkgname"
+  fi
+}
+
 prepare() {
-  cd "$startdir/../.."
-  export RUSTUP_TOOLCHAIN=stable
-  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+  local root
+  if [ -f "$startdir/../../Cargo.toml" ]; then
+    root="$startdir/../.."
+  else
+    rm -rf "$srcdir/$pkgname"
+    git clone --depth 1 "$url.git" "$srcdir/$pkgname"
+    root="$srcdir/$pkgname"
+  fi
+  cd "$root"
+  export CARGO_HOME="$srcdir/.cargo"
+  cargo fetch --locked
 }
 
 build() {
-  cd "$startdir/../.."
-  export RUSTUP_TOOLCHAIN=stable
+  local root
+  root="$(_repo_root)"
+  cd "$root"
+  export CARGO_HOME="$srcdir/.cargo"
   export CARGO_TARGET_DIR="$srcdir/target"
-  cargo build --frozen --release --all-features
+  export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+  cargo build --frozen --release
 }
 
 package() {
-  cd "$startdir/../.."
+  local root
+  root="$(_repo_root)"
+  cd "$root"
   install -Dm755 "$srcdir/target/release/agmonitor" "$pkgdir/usr/bin/agmonitor"
   install -Dm644 config/config.toml "$pkgdir/usr/share/doc/$pkgname/config.toml.example"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

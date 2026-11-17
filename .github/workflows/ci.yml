@@ -21,13 +21,13 @@ jobs:
       - run: cargo build --release --locked
 
   arch:
-    name: Build & lint (Arch Linux)
+    name: Build with system sqlite (Arch Linux)
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
-      - run: pacman -Syu --noconfirm rust git
+      - run: pacman -Syu --noconfirm rust git pkgconf sqlite procps-ng
       - uses: actions/checkout@v4
-      - run: cargo build --release --locked
+      - run: LIBSQLITE3_SYS_USE_PKG_CONFIG=1 cargo build --release --locked
 
   nix:
     name: Nix flake check and build

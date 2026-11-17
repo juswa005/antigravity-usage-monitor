@@ -8,6 +8,7 @@ url="https://github.com/juswa005/antigravity-usage-monitor"
 license=('MIT')
 depends=('gcc-libs' 'glibc' 'sqlite' 'procps-ng')
 makedepends=('cargo' 'gcc' 'git' 'pkgconf' 'sqlite')
+options=('!lto')
 optdepends=(
   'waybar: status bar integration'
   'kitty: terminal popup for dashboard'

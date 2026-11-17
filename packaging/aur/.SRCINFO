@@ -1,0 +1,27 @@
+pkgbase = antigravity-usage-monitor-git
+	pkgdesc = Lightweight TUI dashboard and Waybar module for Google Antigravity CLI usage
+	pkgver = 0.1.0.r3.g4faf028
+	pkgrel = 1
+	url = https://github.com/juswa005/antigravity-usage-monitor
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = cargo
+	makedepends = gcc
+	makedepends = git
+	makedepends = pkgconf
+	makedepends = sqlite
+	depends = gcc-libs
+	depends = glibc
+	depends = sqlite
+	depends = procps-ng
+	optdepends = waybar: status bar integration
+	optdepends = kitty: terminal popup for dashboard
+	optdepends = ttf-jetbrains-mono-nerd: Nerd Font icons in Waybar and TUI
+	provides = antigravity-usage-monitor
+	conflicts = antigravity-usage-monitor
+	options = !lto
+	source = antigravity-usage-monitor-git::git+https://github.com/juswa005/antigravity-usage-monitor.git
+	sha256sums = SKIP
+
+pkgname = antigravity-usage-monitor-git

@@ -1,0 +1,57 @@
+# Maintainer: Amiel Josh Basug <amieljosh05@gmail.com>
+pkgname=antigravity-usage-monitor-git
+pkgver=0.1.0.r3.g4faf028
+pkgrel=1
+pkgdesc="Lightweight TUI dashboard and Waybar module for Google Antigravity CLI usage"
+arch=('x86_64' 'aarch64')
+url="https://github.com/juswa005/antigravity-usage-monitor"
+license=('MIT')
+depends=('gcc-libs' 'glibc' 'sqlite' 'procps-ng')
+makedepends=('cargo' 'gcc' 'git' 'pkgconf' 'sqlite')
+optdepends=(
+  'waybar: status bar integration'
+  'kitty: terminal popup for dashboard'
+  'ttf-jetbrains-mono-nerd: Nerd Font icons in Waybar and TUI'
+)
+provides=('antigravity-usage-monitor')
+conflicts=('antigravity-usage-monitor')
+options=('!lto')
+source=("$pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  local ver
+  ver="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
+  printf "%s.r%s.g%s" "${ver:-0.1.0}" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+  cd "$srcdir/$pkgname"
+  export CARGO_HOME="$srcdir/.cargo"
+  cargo fetch --locked
+}
+
+build() {
+  cd "$srcdir/$pkgname"
+  export CARGO_HOME="$srcdir/.cargo"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+  cargo build --frozen --release
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  install -Dm755 "$srcdir/target/release/agmonitor" "$pkgdir/usr/bin/agmonitor"
+  install -Dm644 config/config.toml "$pkgdir/usr/share/doc/$pkgname/config.toml.example"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+  sed 's|%h/.local/bin/agmonitor|/usr/bin/agmonitor|g' \
+    packaging/systemd/agmonitor-refresh.service \
+    > "$srcdir/agmonitor-refresh.service"
+  install -Dm644 "$srcdir/agmonitor-refresh.service" \
+    "$pkgdir/usr/lib/systemd/user/agmonitor-refresh.service"
+  install -Dm644 packaging/systemd/agmonitor-refresh.timer \
+    "$pkgdir/usr/lib/systemd/user/agmonitor-refresh.timer"
+}

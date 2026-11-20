@@ -40,8 +40,23 @@ struct ConvMeta {
 #[derive(Debug, Clone, Default)]
 pub struct GenStepMeta {
     pub model_label: Option<String>,
+    pub input_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub output_tokens: u64,
     pub thinking_tokens: u64,
     pub response_tokens: u64,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+impl GenStepMeta {
+    pub fn has_data(&self) -> bool {
+        self.model_label.is_some()
+            || self.input_tokens > 0
+            || self.cache_read_tokens > 0
+            || self.output_tokens > 0
+            || self.thinking_tokens > 0
+            || self.response_tokens > 0
+    }
 }
 
 pub fn collect_local_transcripts(
@@ -133,28 +148,38 @@ pub fn collect_local_transcripts(
                 continue;
             }
 
+            let gmeta = gen_metas.get(planner_ord).cloned().unwrap_or_default();
+            planner_ord += 1;
+
             let in_tok = obj
                 .get("input_tokens")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(0);
+                .filter(|&v| v > 0)
+                .unwrap_or(gmeta.input_tokens);
             let cache_tok = obj
                 .get("cache_read_tokens")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(0);
+                .filter(|&v| v > 0)
+                .unwrap_or(gmeta.cache_read_tokens);
             let out_tok = obj
                 .get("output_tokens")
                 .and_then(|v| v.as_u64())
-                .unwrap_or(0);
+                .filter(|&v| v > 0)
+                .unwrap_or_else(|| {
+                    if gmeta.output_tokens > 0 {
+                        gmeta.output_tokens
+                    } else {
+                        gmeta.thinking_tokens + gmeta.response_tokens
+                    }
+                });
             let is_error = obj.get("status").and_then(|v| v.as_str()) == Some("ERROR");
 
-            let created_at = obj
-                .get("created_at")
-                .and_then(|v| v.as_str())
-                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&Utc));
-
-            let gmeta = gen_metas.get(planner_ord).cloned().unwrap_or_default();
-            planner_ord += 1;
+            let created_at = gmeta.created_at.or_else(|| {
+                obj.get("created_at")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                    .map(|dt| dt.with_timezone(&Utc))
+            });
 
             let model_name = gmeta
                 .model_label
@@ -273,6 +298,135 @@ pub fn collect_local_transcripts(
                 entry_day.0.thinking_tokens += think_tok;
                 entry_day.0.response_tokens += resp_tok;
                 entry_day.1.insert(cid.clone());
+            }
+        }
+
+        // Include any additional SQLite gen_metadata steps when transcript.jsonl was compacted
+        if planner_ord < gen_metas.len() {
+            for gmeta in &gen_metas[planner_ord..] {
+                let in_tok = gmeta.input_tokens;
+                let cache_tok = gmeta.cache_read_tokens;
+                let out_tok = if gmeta.output_tokens > 0 {
+                    gmeta.output_tokens
+                } else {
+                    gmeta.thinking_tokens + gmeta.response_tokens
+                };
+                let think_tok = gmeta.thinking_tokens;
+                let resp_tok = if gmeta.response_tokens > 0 || gmeta.thinking_tokens > 0 {
+                    gmeta.response_tokens
+                } else {
+                    out_tok
+                };
+                let model_name = gmeta
+                    .model_label
+                    .clone()
+                    .unwrap_or_else(|| "Unknown / Unattributed".to_string());
+
+                *conv_model_counts.entry(model_name.clone()).or_insert(0) += 1;
+                conv_steps += 1;
+                conv_in += in_tok;
+                conv_cache += cache_tok;
+                conv_out += out_tok;
+                if let Some(ts) = gmeta.created_at {
+                    if conv_last_activity.map(|cur| ts > cur).unwrap_or(true) {
+                        conv_last_activity = Some(ts);
+                    }
+                }
+
+                add_step_to_window(
+                    &mut agg.window_all_time,
+                    in_tok,
+                    cache_tok,
+                    out_tok,
+                    think_tok,
+                    resp_tok,
+                    false,
+                );
+                convs_all.insert(cid.clone());
+
+                let m_entry = agg.model_totals.entry(model_name).or_default();
+                m_entry.steps_all_time += 1;
+                m_entry.input_tokens += in_tok;
+                m_entry.cache_read_tokens += cache_tok;
+                m_entry.output_tokens += out_tok;
+                m_entry.thinking_tokens += think_tok;
+                m_entry.response_tokens += resp_tok;
+
+                if let Some(ts) = gmeta.created_at {
+                    if ts >= cutoff_5h {
+                        add_step_to_window(
+                            &mut agg.window_5h,
+                            in_tok,
+                            cache_tok,
+                            out_tok,
+                            think_tok,
+                            resp_tok,
+                            false,
+                        );
+                        convs_5h.insert(cid.clone());
+                        m_entry.steps_5h += 1;
+                    }
+                    if ts >= today_start_utc {
+                        add_step_to_window(
+                            &mut agg.window_today,
+                            in_tok,
+                            cache_tok,
+                            out_tok,
+                            think_tok,
+                            resp_tok,
+                            false,
+                        );
+                        convs_today.insert(cid.clone());
+                    }
+                    if ts >= cutoff_7d {
+                        add_step_to_window(
+                            &mut agg.window_7d,
+                            in_tok,
+                            cache_tok,
+                            out_tok,
+                            think_tok,
+                            resp_tok,
+                            false,
+                        );
+                        convs_7d.insert(cid.clone());
+                    }
+                    if ts >= cutoff_30d {
+                        add_step_to_window(
+                            &mut agg.window_30d,
+                            in_tok,
+                            cache_tok,
+                            out_tok,
+                            think_tok,
+                            resp_tok,
+                            false,
+                        );
+                        convs_30d.insert(cid.clone());
+                    }
+
+                    let day_key = ts.with_timezone(&Local).format("%Y-%m-%d").to_string();
+                    let entry_day = daily_map.entry(day_key.clone()).or_insert_with(|| {
+                        (
+                            DailyTokenBucket {
+                                day_local: day_key,
+                                planner_steps: 0,
+                                input_tokens: 0,
+                                cache_read_tokens: 0,
+                                output_tokens: 0,
+                                thinking_tokens: 0,
+                                response_tokens: 0,
+                                conversations_active: 0,
+                            },
+                            HashSet::new(),
+                        )
+                    });
+                    entry_day.0.planner_steps += 1;
+                    entry_day.0.input_tokens += in_tok;
+                    entry_day.0.cache_read_tokens += cache_tok;
+                    entry_day.0.output_tokens += out_tok;
+                    entry_day.0.thinking_tokens += think_tok;
+                    entry_day.0.response_tokens += resp_tok;
+                    entry_day.1.insert(cid.clone());
+                }
             }
         }
 
@@ -428,6 +582,8 @@ fn read_gen_metadata(db_path: &Path) -> Vec<GenStepMeta> {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
+    let step_timestamps = read_step_timestamps(&conn);
+
     let Ok(mut stmt) = conn.prepare("SELECT idx, data FROM gen_metadata ORDER BY idx ASC") else {
         return Vec::new();
     };
@@ -441,9 +597,63 @@ fn read_gen_metadata(db_path: &Path) -> Vec<GenStepMeta> {
 
     let mut out = Vec::new();
     for (_idx, data) in rows.flatten() {
-        out.push(decode_gen_meta_blob(&data));
+        let mut meta = decode_gen_meta_blob(&data);
+        if meta.has_data() {
+            let ord = out.len();
+            if let Some(&ts) = step_timestamps.get(ord) {
+                meta.created_at = ts;
+            }
+            out.push(meta);
+        }
     }
     out
+}
+
+fn read_step_timestamps(conn: &Connection) -> Vec<Option<DateTime<Utc>>> {
+    let Ok(mut stmt) =
+        conn.prepare("SELECT metadata FROM steps WHERE step_type = 15 ORDER BY idx ASC")
+    else {
+        return Vec::new();
+    };
+    let Ok(rows) = stmt.query_map([], |row| {
+        let data: Option<Vec<u8>> = row.get(0).ok();
+        Ok(data)
+    }) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::new();
+    for blob_opt in rows.flatten() {
+        let ts = blob_opt.as_deref().and_then(decode_step_timestamp_blob);
+        out.push(ts);
+    }
+    out
+}
+
+fn decode_step_timestamp_blob(buf: &[u8]) -> Option<DateTime<Utc>> {
+    for (fn_top, wt_top, val_top) in pb_fields(buf) {
+        if matches!(fn_top, 1 | 6 | 7 | 8) && wt_top == 2 {
+            let mut secs: Option<i64> = None;
+            let mut nanos: u32 = 0;
+            for (fn_ts, wt_ts, val_ts) in pb_fields(val_top) {
+                if wt_ts == 0 {
+                    if let Some(v) = decode_varint_full(val_ts) {
+                        match fn_ts {
+                            1 => secs = i64::try_from(v).ok(),
+                            2 => nanos = u32::try_from(v).unwrap_or(0),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            if let Some(s) = secs.filter(|&s| s > 1_600_000_000) {
+                if let Some(dt) = DateTime::from_timestamp(s, nanos) {
+                    return Some(dt);
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn decode_gen_meta_blob(buf: &[u8]) -> GenStepMeta {
@@ -473,6 +683,9 @@ pub fn decode_gen_meta_blob(buf: &[u8]) -> GenStepMeta {
                             if wt_stat == 0 {
                                 if let Some(v) = decode_varint_full(val_stat) {
                                     match fn_stat {
+                                        2 => meta.input_tokens = v,
+                                        3 => meta.output_tokens = v,
+                                        5 => meta.cache_read_tokens = v,
                                         9 => meta.thinking_tokens = v,
                                         10 => meta.response_tokens = v,
                                         _ => {}
@@ -485,6 +698,10 @@ pub fn decode_gen_meta_blob(buf: &[u8]) -> GenStepMeta {
                 }
             }
         }
+    }
+
+    if meta.output_tokens == 0 && (meta.thinking_tokens > 0 || meta.response_tokens > 0) {
+        meta.output_tokens = meta.thinking_tokens + meta.response_tokens;
     }
 
     if meta.model_label.is_none() {

@@ -64,11 +64,16 @@
       nixosModules.default = { config, lib, pkgs, ... }:
         let
           cfg = config.services.antigravity-usage-monitor;
-          pkg = self.packages.${pkgs.stdenv.hostPlatform.system}.agmonitor;
+          defaultPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.agmonitor;
         in
         {
           options.services.antigravity-usage-monitor = {
             enable = lib.mkEnableOption "Antigravity Usage Monitor system package and optional user refresh timer";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = defaultPkg;
+              description = "The agmonitor package to install and run.";
+            };
             enableUserTimer = lib.mkOption {
               type = lib.types.bool;
               default = false;
@@ -77,14 +82,14 @@
           };
 
           config = lib.mkIf cfg.enable {
-            environment.systemPackages = [ pkg ];
+            environment.systemPackages = [ cfg.package ];
 
             systemd.user.services.agmonitor-refresh = lib.mkIf cfg.enableUserTimer {
               description = "Refresh Antigravity Usage Monitor cache and SQLite history";
               after = [ "graphical-session.target" ];
               serviceConfig = {
                 Type = "oneshot";
-                ExecStart = "${pkg}/bin/agmonitor refresh --signal-waybar";
+                ExecStart = "${cfg.package}/bin/agmonitor refresh --signal-waybar";
               };
             };
 
